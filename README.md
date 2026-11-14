@@ -47,5 +47,3 @@ Não precisa instalar nem compilar nada.
 - **Three.js (WebGL):** desenho da casa 3D, luzes, sombras, pessoas e viaturas.
 - **Canvas:** texturas geradas pelo próprio código (grama, madeira, piso, telhado) e foto da câmera.
 - **Web Audio API:** som da sirene gerado pelo código.
-
-O código foi escrito com a ajuda de uma inteligência artificial (Claude Code), a partir das ideias e decisões do grupo.
