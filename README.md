@@ -2,7 +2,7 @@
 
 O SafeHouse é um simulador de sistema de segurança para casas. Ele mostra uma casa em 3D com 23 sensores e permite testar invasões e emergências para ver o que cada sensor detecta, como a casa reage e o que chega no celular do morador.
 
-**Site online:** _(link adicionado após publicar)_
+**Site online:** https://luizprestes-ops.github.io/safehouse/
 
 ## Grupo
 
