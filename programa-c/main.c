@@ -18,27 +18,26 @@
 
 static void mostrarMenu(const Sistema *s)
 {
-    int i, ligados = 0;
-    for (i = 0; i < s->quantidade; i++) {
-        ligados += s->lista[i].ligado;
-    }
-    printf("\n==============================================\n");
+    printf("\n====================================================\n");
     printf("   SAFEHOUSE - Central de Segurança\n");
-    printf("   Modo: %-10s | Sensores: %d (%d ligados)\n", nomeModo(s->modo), s->quantidade, ligados);
-    printf("==============================================\n");
-    printf(" SENSORES\n");
+    printf("   Modo do alarme: %s\n", nomeModo(s->modo));
+    /* Obrigatória 5: contabilizar registros */
+    printf("   Registros ativos: %d | excluídos: %d | no arquivo: %d\n",
+           contarAtivos(s), contarExcluidos(s), s->quantidade);
+    printf("====================================================\n");
+    printf(" REGISTROS (SENSORES)\n");
     printf("   1 - Cadastrar sensor\n");
-    printf("   2 - Listar sensores\n");
-    printf("   3 - Buscar sensor\n");
-    printf("   4 - Alterar sensor (ligar/desligar, nome, local, tipo)\n");
-    printf("   5 - Excluir sensor\n");
+    printf("   2 - Consultar sensor por código\n");
+    printf("   3 - Exportar registros para TXT\n");
+    printf("   4 - Excluir sensor (exclusão lógica)\n");
+    printf("   5 - Listar sensores ativos\n");
+    printf("   6 - Buscar sensores por tipo\n");
+    printf("   7 - Alterar sensor (ligar/desligar, nome, local, tipo)\n");
     printf(" ALARME\n");
-    printf("   6 - Mudar modo do alarme\n");
-    printf("   7 - Simular detecção (invasão ou emergência)\n");
-    printf(" ARQUIVOS\n");
-    printf("   8 - Ver histórico de eventos\n");
-    printf("   9 - Gerar relatório TXT\n");
-    printf("  10 - Apagar histórico de eventos\n");
+    printf("   8 - Mudar modo do alarme\n");
+    printf("   9 - Simular detecção (invasão ou emergência)\n");
+    printf("  10 - Ver histórico de eventos\n");
+    printf("  11 - Apagar histórico de eventos\n");
     printf("   0 - Sair\n");
 }
 
@@ -53,8 +52,8 @@ int main(void)
 #endif
 
     if (carregarSistema(&sistema)) {
-        printf("Dados carregados de %s: %d sensores, modo %s.\n",
-               ARQ_SENSORES, sistema.quantidade, nomeModo(sistema.modo));
+        printf("Dados carregados de %s: %d sensores ativos, modo %s.\n",
+               ARQ_SENSORES, contarAtivos(&sistema), nomeModo(sistema.modo));
     } else {
         carregarSensoresPadrao(&sistema);
         salvarSistema(&sistema);
@@ -64,18 +63,19 @@ int main(void)
 
     do {
         mostrarMenu(&sistema);
-        opcao = lerInteiro("Escolha uma opção: ", 0, 10);
+        opcao = lerInteiro("Escolha uma opção: ", 0, 11);
         switch (opcao) {
-        case 1:  cadastrarSensor(&sistema);  break;
-        case 2:  listarSensores(&sistema);   break;
-        case 3:  buscarSensor(&sistema);     break;
-        case 4:  alterarSensor(&sistema);    break;
-        case 5:  excluirSensor(&sistema);    break;
-        case 6:  mudarModo(&sistema);        break;
-        case 7:  simularDeteccao(&sistema);  break;
-        case 8:  listarHistorico();          break;
-        case 9:  gerarRelatorio(&sistema);   break;
-        case 10: limparHistorico();          break;
+        case 1:  cadastrarSensor(&sistema);    break;
+        case 2:  consultarPorCodigo(&sistema); break;
+        case 3:  exportarTXT(&sistema);        break;
+        case 4:  excluirSensor(&sistema);      break;
+        case 5:  listarSensores(&sistema);     break;
+        case 6:  buscarPorTipo(&sistema);      break;
+        case 7:  alterarSensor(&sistema);      break;
+        case 8:  mudarModo(&sistema);          break;
+        case 9:  simularDeteccao(&sistema);    break;
+        case 10: listarHistorico();            break;
+        case 11: limparHistorico();            break;
         default: break;
         }
         if (opcao != 0) {

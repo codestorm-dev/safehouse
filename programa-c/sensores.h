@@ -1,5 +1,6 @@
 /*
- * sensores.h - Structs e funções dos sensores e do modo do alarme.
+ * sensores.h - Structs e funções dos sensores (os registros do sistema)
+ *              e do modo do alarme.
  */
 #ifndef SENSORES_H
 #define SENSORES_H
@@ -28,19 +29,26 @@ enum ModoAlarme {
     MODO_AUSENTE        /* tudo armado */
 };
 
-/* Um sensor instalado na casa */
+/* Status do registro: usado na exclusão lógica */
+enum StatusRegistro {
+    STATUS_EXCLUIDO = 0,    /* continua no arquivo, mas não aparece mais */
+    STATUS_ATIVO    = 1
+};
+
+/* Um sensor instalado na casa (o registro do sistema) */
 typedef struct {
-    int  codigo;                /* número único do sensor */
+    int  codigo;                /* código único do sensor */
     char nome[TAM_NOME];        /* ex.: "Porta da frente" */
     char comodo[TAM_COMODO];    /* onde está instalado */
     int  tipo;                  /* enum TipoSensor */
     int  ligado;                /* 1 = ligado, 0 = desligado */
+    int  status;                /* enum StatusRegistro (exclusão lógica) */
 } Sensor;
 
-/* Estado completo da central: lista de sensores + modo atual */
+/* Estado completo da central: registros + modo atual */
 typedef struct {
     Sensor lista[MAX_SENSORES];
-    int    quantidade;
+    int    quantidade;          /* registros no arquivo (ativos + excluídos) */
     int    modo;                /* enum ModoAlarme */
 } Sistema;
 
@@ -51,22 +59,29 @@ const char *nomeModo(int modo);
 /* Regra do alarme: 1 se esse tipo de sensor está armado no modo dado */
 int tipoArmado(int tipo, int modo);
 
-/* Procura o sensor pelo código; devolve a posição na lista ou -1 */
+/* Procura um sensor ATIVO pelo código; devolve a posição ou -1 */
 int buscarIndice(const Sistema *s, int codigo);
+
+/* Contagem de registros (aparece no menu) */
+int contarAtivos(const Sistema *s);
+int contarExcluidos(const Sistema *s);
 
 /* Arquivo binário */
 int  carregarSistema(Sistema *s);           /* 1 = carregou, 0 = não existia */
 int  salvarSistema(const Sistema *s);       /* 1 = salvou, 0 = erro */
 void carregarSensoresPadrao(Sistema *s);    /* os sensores da casa do projeto */
 
-/* Funcionalidade 1: gerenciar sensores */
-void cadastrarSensor(Sistema *s);
-void listarSensores(const Sistema *s);
-void buscarSensor(const Sistema *s);
-void alterarSensor(Sistema *s);
-void excluirSensor(Sistema *s);
+/* Funcionalidades obrigatórias */
+void cadastrarSensor(Sistema *s);           /* 1. cadastrar */
+void consultarPorCodigo(const Sistema *s);  /* 2. consultar por código */
+void excluirSensor(Sistema *s);             /* 4. exclusão lógica */
+/* 3. exportar TXT: exportarTXT() em eventos.c
+ * 5. contabilizar: contarAtivos() mostrado no menu (main.c) */
 
-/* Funcionalidade 2: modo do alarme */
+/* Funcionalidades extras */
+void listarSensores(const Sistema *s);
+void buscarPorTipo(const Sistema *s);
+void alterarSensor(Sistema *s);
 void mudarModo(Sistema *s);
 
 /* Mostra uma linha da tabela de sensores */

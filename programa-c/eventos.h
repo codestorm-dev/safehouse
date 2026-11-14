@@ -28,14 +28,12 @@ typedef struct {
     int  resultado;             /* enum Resultado */
 } Evento;
 
-/* Funcionalidade 3: simular uma invasão ou emergência */
-void simularDeteccao(const Sistema *s);
+/* Obrigatória 3: exportar todos os registros para texto (relatorio.txt) */
+void exportarTXT(const Sistema *s);
 
-/* Funcionalidade 4: histórico de eventos (eventos.dat) */
+/* Extras: simular uma invasão ou emergência e histórico (eventos.dat) */
+void simularDeteccao(const Sistema *s);
 void listarHistorico(void);
 void limparHistorico(void);
-
-/* Funcionalidade 5: relatório em texto (relatorio.txt) */
-void gerarRelatorio(const Sistema *s);
 
 #endif

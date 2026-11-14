@@ -77,12 +77,15 @@ void simularDeteccao(const Sistema *s)
     Evento e;
 
     printf("\n=== SIMULAR DETECÇÃO === (modo do alarme: %s)\n", nomeModo(s->modo));
-    if (s->quantidade == 0) {
+    if (contarAtivos(s) == 0) {
         printf("Cadastre um sensor antes de simular.\n");
         return;
     }
     printf("Qual sensor percebeu algo? (intruso, fumaça ou gás)\n");
     for (i = 0; i < s->quantidade; i++) {
+        if (s->lista[i].status != STATUS_ATIVO) {
+            continue;
+        }
         printf("  %4d - %s (%s)%s\n", s->lista[i].codigo, s->lista[i].nome,
                s->lista[i].comodo, s->lista[i].ligado ? "" : " [desligado]");
     }
@@ -92,7 +95,7 @@ void simularDeteccao(const Sistema *s)
         if (pos >= 0) {
             break;
         }
-        printf("  [ERRO] Não existe sensor com o código %d.\n", codigo);
+        printf("  [ERRO] Não existe sensor ativo com o código %d.\n", codigo);
     }
     x = &s->lista[pos];
 
@@ -173,11 +176,12 @@ void limparHistorico(void)
     }
 }
 
-void gerarRelatorio(const Sistema *s)
+void exportarTXT(const Sistema *s)
 {
     FILE *txt, *dat;
     char agora[20];
     int i, t, ligados = 0, armados = 0, total = 0, disparos = 0, registrados = 0;
+    int ativos = contarAtivos(s), excluidos = contarExcluidos(s);
     int porTipo[TOTAL_TIPOS + 1] = {0};
     Evento e;
 
@@ -189,6 +193,9 @@ void gerarRelatorio(const Sistema *s)
     dataHoraAtual(agora, sizeof(agora));
 
     for (i = 0; i < s->quantidade; i++) {
+        if (s->lista[i].status != STATUS_ATIVO) {
+            continue;
+        }
         if (s->lista[i].tipo >= 1 && s->lista[i].tipo <= TOTAL_TIPOS) {
             porTipo[s->lista[i].tipo]++;
         }
@@ -205,19 +212,34 @@ void gerarRelatorio(const Sistema *s)
     fprintf(txt, "  Gerado em: %s\n", agora);
     fprintf(txt, "==============================================================\n\n");
     fprintf(txt, "Modo do alarme: %s\n", nomeModo(s->modo));
-    fprintf(txt, "Sensores: %d instalados | %d ligados | %d armados\n\n", s->quantidade, ligados, armados);
+    fprintf(txt, "Registros: %d ativos | %d excluidos | %d no arquivo binario\n", ativos, excluidos, s->quantidade);
+    fprintf(txt, "Sensores ativos: %d ligados | %d armados agora\n\n", ligados, armados);
 
     fprintf(txt, "SENSORES POR TIPO\n");
     for (t = 1; t <= TOTAL_TIPOS; t++) {
         fprintf(txt, "  %-16s %d\n", nomeTipo(t), porTipo[t]);
     }
 
-    fprintf(txt, "\nLISTA DE SENSORES\n");
+    fprintf(txt, "\nSENSORES ATIVOS\n");
     fprintf(txt, "%-4s %-28s %-9s %-16s %s\n", "COD", "NOME", "LOCAL", "TIPO", "ESTADO");
     for (i = 0; i < s->quantidade; i++) {
         const Sensor *x = &s->lista[i];
+        if (x->status != STATUS_ATIVO) {
+            continue;
+        }
         fprintf(txt, "%-4d %-28s %-9s %-16s %s\n", x->codigo, x->nome, x->comodo,
                 nomeTipo(x->tipo), x->ligado ? "Ligado" : "Desligado");
+    }
+
+    fprintf(txt, "\nREGISTROS EXCLUIDOS (exclusao logica: continuam no arquivo binario)\n");
+    if (excluidos == 0) {
+        fprintf(txt, "  Nenhum registro excluido.\n");
+    }
+    for (i = 0; i < s->quantidade; i++) {
+        const Sensor *x = &s->lista[i];
+        if (x->status == STATUS_EXCLUIDO) {
+            fprintf(txt, "%-4d %-28s %-9s %-16s EXCLUIDO\n", x->codigo, x->nome, x->comodo, nomeTipo(x->tipo));
+        }
     }
 
     fprintf(txt, "\nHISTORICO DE EVENTOS\n");
@@ -243,17 +265,18 @@ void gerarRelatorio(const Sistema *s)
 
     /* pontos fracos: sensores desligados */
     fprintf(txt, "\nPONTOS DE ATENCAO\n");
-    if (ligados == s->quantidade) {
-        fprintf(txt, "  Todos os sensores estao ligados.\n");
+    if (ligados == ativos) {
+        fprintf(txt, "  Todos os sensores ativos estao ligados.\n");
     } else {
         for (i = 0; i < s->quantidade; i++) {
-            if (!s->lista[i].ligado) {
+            if (s->lista[i].status == STATUS_ATIVO && !s->lista[i].ligado) {
                 fprintf(txt, "  ! %s (%s) esta desligado\n", s->lista[i].nome, s->lista[i].comodo);
             }
         }
     }
     fclose(txt);
 
-    printf("\n[OK] Relatório salvo em %s (%d sensores, %d eventos).\n", ARQ_RELATORIO, s->quantidade, total);
+    printf("\n[OK] Registros exportados para %s (%d ativos, %d excluídos, %d eventos).\n",
+           ARQ_RELATORIO, ativos, excluidos, total);
     printf("Abra o arquivo no Bloco de Notas para ver.\n");
 }

@@ -53,11 +53,40 @@ int buscarIndice(const Sistema *s, int codigo)
 {
     int i;
     for (i = 0; i < s->quantidade; i++) {
+        if (s->lista[i].codigo == codigo && s->lista[i].status == STATUS_ATIVO) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Procura o código entre TODOS os registros, inclusive os excluídos.
+ * Usado no cadastro para não repetir o código de um registro que ainda está no arquivo. */
+static int buscarQualquer(const Sistema *s, int codigo)
+{
+    int i;
+    for (i = 0; i < s->quantidade; i++) {
         if (s->lista[i].codigo == codigo) {
             return i;
         }
     }
     return -1;
+}
+
+int contarAtivos(const Sistema *s)
+{
+    int i, total = 0;
+    for (i = 0; i < s->quantidade; i++) {
+        if (s->lista[i].status == STATUS_ATIVO) {
+            total++;
+        }
+    }
+    return total;
+}
+
+int contarExcluidos(const Sistema *s)
+{
+    return s->quantidade - contarAtivos(s);
 }
 
 /* ---------- arquivo binário ---------- */
@@ -115,6 +144,7 @@ static void adicionar(Sistema *s, int codigo, const char *nome, const char *como
     x->comodo[TAM_COMODO - 1] = '\0';
     x->tipo = tipo;
     x->ligado = 1;
+    x->status = STATUS_ATIVO;
 }
 
 void carregarSensoresPadrao(Sistema *s)
@@ -192,11 +222,17 @@ void cadastrarSensor(Sistema *s)
         return;
     }
     for (;;) {
+        int pos;
         novo.codigo = lerInteiro("Código do sensor (1 a 9999): ", 1, 9999);
-        if (buscarIndice(s, novo.codigo) < 0) {
+        pos = buscarQualquer(s, novo.codigo);
+        if (pos < 0) {
             break;
         }
-        printf("  [ERRO] Já existe um sensor com o código %d. Escolha outro.\n", novo.codigo);
+        if (s->lista[pos].status == STATUS_EXCLUIDO) {
+            printf("  [ERRO] O código %d pertence a um sensor excluído que continua no arquivo. Escolha outro.\n", novo.codigo);
+        } else {
+            printf("  [ERRO] Já existe um sensor com o código %d. Escolha outro.\n", novo.codigo);
+        }
     }
     lerTexto("Nome do sensor: ", novo.nome, TAM_NOME);
     novo.tipo = escolherTipo();
@@ -204,6 +240,7 @@ void cadastrarSensor(Sistema *s)
     strncpy(novo.comodo, comodo, TAM_COMODO - 1);
     novo.comodo[TAM_COMODO - 1] = '\0';
     novo.ligado = 1;
+    novo.status = STATUS_ATIVO;
 
     s->lista[s->quantidade++] = novo;
     if (salvarSistema(s)) {
@@ -216,12 +253,15 @@ void listarSensores(const Sistema *s)
     int i, ligados = 0, armados = 0;
 
     printf("\n=== SENSORES INSTALADOS === (modo do alarme: %s)\n", nomeModo(s->modo));
-    if (s->quantidade == 0) {
-        printf("Nenhum sensor cadastrado.\n");
+    if (contarAtivos(s) == 0) {
+        printf("Nenhum sensor ativo cadastrado.\n");
         return;
     }
     cabecalhoTabela();
     for (i = 0; i < s->quantidade; i++) {
+        if (s->lista[i].status != STATUS_ATIVO) {
+            continue;                   /* excluído: não aparece */
+        }
         mostrarSensor(s, &s->lista[i]);
         if (s->lista[i].ligado) {
             ligados++;
@@ -230,42 +270,65 @@ void listarSensores(const Sistema *s)
             }
         }
     }
-    printf("\nTotal: %d sensores | %d ligados | %d armados agora\n", s->quantidade, ligados, armados);
+    printf("\nTotal: %d sensores ativos | %d ligados | %d armados agora\n", contarAtivos(s), ligados, armados);
 }
 
-void buscarSensor(const Sistema *s)
+void consultarPorCodigo(const Sistema *s)
 {
-    int opcao, i, achou = 0;
+    int codigo, i, pos = -1;
+    const Sensor *x;
 
-    printf("\n=== BUSCAR SENSOR ===\n");
-    printf("1 - Pelo código\n2 - Por tipo\n");
-    opcao = lerInteiro("Opção: ", 1, 2);
-
-    if (opcao == 1) {
-        int codigo = lerInteiro("Código: ", 1, 9999);
-        int pos = buscarIndice(s, codigo);
-        if (pos < 0) {
-            printf("[AVISO] Nenhum sensor com o código %d.\n", codigo);
-            return;
+    printf("\n=== CONSULTAR SENSOR POR CÓDIGO ===\n");
+    codigo = lerInteiro("Código do sensor: ", 1, 9999);
+    for (i = 0; i < s->quantidade; i++) {
+        if (s->lista[i].codigo == codigo) {
+            pos = i;
+            break;
         }
-        cabecalhoTabela();
-        mostrarSensor(s, &s->lista[pos]);
-    } else {
-        int tipo = escolherTipo();
-        for (i = 0; i < s->quantidade; i++) {
-            if (s->lista[i].tipo == tipo) {
-                if (!achou) {
-                    cabecalhoTabela();
-                }
-                mostrarSensor(s, &s->lista[i]);
-                achou++;
+    }
+    if (pos < 0) {
+        printf("[AVISO] Nenhum sensor com o código %d.\n", codigo);
+        return;
+    }
+    x = &s->lista[pos];
+    if (x->status == STATUS_EXCLUIDO) {
+        printf("[AVISO] O sensor %d (%s) foi excluído.\n", codigo, x->nome);
+        printf("        O registro continua no arquivo binário com status EXCLUÍDO.\n");
+        return;
+    }
+    printf("\n+------------------------------------------------+\n");
+    printf("  Código ............: %d\n", x->codigo);
+    printf("  Nome ..............: %s\n", x->nome);
+    printf("  Local .............: %s\n", x->comodo);
+    printf("  Tipo ..............: %s\n", nomeTipo(x->tipo));
+    printf("  Estado ............: %s\n", x->ligado ? "Ligado" : "Desligado");
+    printf("  No modo %-10s: %s\n", nomeModo(s->modo),
+           !x->ligado ? "não detecta (desligado)" :
+           tipoArmado(x->tipo, s->modo) ? "ARMADO: dispara o alarme" : "só registra no histórico");
+    printf("  Status do registro : Ativo\n");
+    printf("  Posição no arquivo : registro %d de %d\n", pos + 1, s->quantidade);
+    printf("+------------------------------------------------+\n");
+}
+
+void buscarPorTipo(const Sistema *s)
+{
+    int i, tipo, achou = 0;
+
+    printf("\n=== BUSCAR SENSORES POR TIPO ===\n");
+    tipo = escolherTipo();
+    for (i = 0; i < s->quantidade; i++) {
+        if (s->lista[i].status == STATUS_ATIVO && s->lista[i].tipo == tipo) {
+            if (!achou) {
+                cabecalhoTabela();
             }
+            mostrarSensor(s, &s->lista[i]);
+            achou++;
         }
-        if (!achou) {
-            printf("[AVISO] Nenhum sensor do tipo %s.\n", nomeTipo(tipo));
-        } else {
-            printf("\n%d sensor(es) do tipo %s.\n", achou, nomeTipo(tipo));
-        }
+    }
+    if (!achou) {
+        printf("[AVISO] Nenhum sensor ativo do tipo %s.\n", nomeTipo(tipo));
+    } else {
+        printf("\n%d sensor(es) do tipo %s.\n", achou, nomeTipo(tipo));
     }
 }
 
@@ -317,9 +380,9 @@ void alterarSensor(Sistema *s)
 
 void excluirSensor(Sistema *s)
 {
-    int codigo, pos, i;
+    int codigo, pos;
 
-    printf("\n=== EXCLUIR SENSOR ===\n");
+    printf("\n=== EXCLUIR SENSOR (exclusão lógica) ===\n");
     codigo = lerInteiro("Código do sensor: ", 1, 9999);
     pos = buscarIndice(s, codigo);
     if (pos < 0) {
@@ -332,12 +395,12 @@ void excluirSensor(Sistema *s)
         printf("Exclusão cancelada.\n");
         return;
     }
-    for (i = pos; i < s->quantidade - 1; i++) {
-        s->lista[i] = s->lista[i + 1];      /* puxa os próximos uma posição */
-    }
-    s->quantidade--;
+    /* exclusão lógica: o registro NÃO sai do arquivo, só muda o status */
+    s->lista[pos].status = STATUS_EXCLUIDO;
     if (salvarSistema(s)) {
-        printf("[OK] Sensor %d excluído.\n", codigo);
+        printf("[OK] Sensor %d marcado como EXCLUÍDO.\n", codigo);
+        printf("     O registro continua no arquivo %s, mas não aparece mais nas listas.\n", ARQ_SENSORES);
+        printf("     Registros ativos: %d | excluídos: %d\n", contarAtivos(s), contarExcluidos(s));
     }
 }
 
