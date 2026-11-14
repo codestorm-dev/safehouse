@@ -1,0 +1,15 @@
+# executáveis e arquivos compilados
+*.exe
+*.o
+
+# arquivos gerados ao rodar
+*.dat
+*.log
+
+# arquivo de edição interna (o site publicado é o index.html)
+safehouse.html
+
+# sistema
+Thumbs.db
+desktop.ini
+.DS_Store
