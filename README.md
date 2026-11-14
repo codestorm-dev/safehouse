@@ -27,6 +27,7 @@ O SafeHouse é um simulador de sistema de segurança para casas. Ele mostra uma 
 | Arquivo | Para que serve |
 |---|---|
 | `index.html` | O site completo: a casa 3D, a central de controle, os cenários e o app do morador. Tudo (HTML, CSS e JavaScript) está neste arquivo. |
+| `programa-c/` | A central do alarme em **linguagem C**: structs, funções, arquivos binários (`.dat`) e relatório em TXT. Veja o [README do programa em C](programa-c/README.md). |
 | `README.md` | Este texto de apresentação do projeto. |
 | `.gitignore` | Lista de arquivos que não vão para o GitHub. |
 

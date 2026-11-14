@@ -5,6 +5,7 @@
 # arquivos gerados ao rodar
 *.dat
 *.log
+relatorio.txt
 
 # arquivo de edição interna (o site publicado é o index.html)
 safehouse.html
