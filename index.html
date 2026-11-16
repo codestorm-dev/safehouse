@@ -804,6 +804,19 @@ function build3D(){
   const HOPS=MURO.map(m=>({a:m.slice(0,4),h:m[4]+.05,r:14})).concat([{a:[100,320,100,390],h:.95,r:10}]);
   function hop(p){let h=0;HOPS.forEach(o=>{const d=segDist(p,o.a);if(d<o.r)h=Math.max(h,o.h*Math.cos(d/o.r*Math.PI/2));});return h;}
 
+  /* ---------- morador: aparece andando pela casa no modo Em casa ---------- */
+  const resP=makePerson({top:0x2f8f6a,legs:0x2c4a7a,skin:0xc89a78});
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(.128,16,8,0,Math.PI*2,0,Math.PI/2.3),M(0x2a1c12));hair.position.y=.015;resP.head.add(hair);
+  const resRing=new THREE.Mesh(new THREE.RingGeometry(.42,.52,40),new THREE.MeshBasicMaterial({color:0x43c391,transparent:true,opacity:.75,side:THREE.DoubleSide,depthWrite:false}));resRing.rotation.x=-Math.PI/2;resRing.position.y=.06;resP.g.add(resRing);
+  const resLbl=document.createElement('div');resLbl.className='bub';resLbl.textContent='Morador';resLbl.style.background='#43c391';resLbl.hidden=true;labels.appendChild(resLbl);
+  // passeio pela sala e cozinha; na emergência de fumaça/gás ele sai pela porta da frente
+  const RES_WALK=[{x:200,y:330,wait:2.5,act:'look'},{x:390,y:330},{x:480,y:280},{x:480,y:240},{x:640,y:215,wait:3,act:'inspect'},{x:480,y:240},{x:480,y:280},{x:390,y:330},{x:360,y:430,wait:2,act:'idle'},{x:250,y:380}];
+  const RES_EXIT=[{x:360,y:440},{x:265,y:452},{x:265,y:505},{x:190,y:530}];
+  const res={x:RES_WALK[0].x,y:RES_WALK[0].y,i:1,wait:1,act:'idle',vis:false,exit:false};
+  function resTo(path,dt){const tg=path[res.i],dx=tg.x-res.x,dy=tg.y-res.y,d=Math.hypot(dx,dy),step=(res.exit?70:40)*dt;
+    if(d<=step){res.x=tg.x;res.y=tg.y;if(tg.wait){res.wait=tg.wait;res.act=tg.act;}res.i++;return true;}
+    res.x+=dx/d*step;res.y+=dy/d*step;return false;}
+
   /* ---------- escada (lado de fora) e corda (lado de dentro) ---------- */
   const WALL_OUT=[[0,-1],[-1,0],[1,0]];
   const mLadder=M(0xa7b0b5,{metalness:.6,roughness:.4}),mRope=M(0xc9a66b,{roughness:1});
@@ -965,6 +978,21 @@ function build3D(){
       torch.intensity=night?2.2:0;
       DOORS.forEach(D=>{if(Math.hypot(actor.x-D.x,actor.y-D.y)<30&&!D.target){D.target=1;}});
     }
+    // morador
+    const wantRes=state.mode==='casa';
+    if(wantRes&&!res.vis){Object.assign(res,{x:RES_WALK[0].x,y:RES_WALK[0].y,i:1,wait:1,act:'idle',exit:false});resP.g.position.copy(V(res.x,res.y,0));}
+    res.vis=wantRes;resP.g.visible=wantRes;resLbl.hidden=!wantRes;
+    if(wantRes){
+      if(state.alarm&&state.alarmKind==='fogo'&&!res.exit){res.exit=true;res.i=0;res.wait=0;}
+      if(!state.alarm&&res.exit){res.exit=false;res.i=0;res.wait=0;}
+      const path=res.exit?RES_EXIT:RES_WALK;
+      if(res.wait>0){res.wait-=dt;animatePerson(resP,res.act||'idle',dt);}
+      else if(res.exit&&res.i>=path.length){animatePerson(resP,'idle',dt);}
+      else{resTo(path,dt);if(!res.exit&&res.i>=path.length)res.i=0;animatePerson(resP,res.exit?'run':'walk',dt);}
+      faceMove(resP,V(res.x,res.y,0),dt);
+      resRing.material.opacity=.45+.3*Math.sin(T*3);
+      DOORS.forEach(D=>{if(Math.hypot(res.x-D.x,res.y-D.y)<30&&!D.target)D.target=1;});
+    }
     DOORS.forEach(D=>{D.open+=(D.target-D.open)*Math.min(1,dt*3);if(D.type==='swing')D.pivot.rotation.y=D.dir*1.35*D.open;else D.mesh.position.y=1.2+1.0*D.open;});
     // luzes
     roomLights.forEach(o=>{o.l.intensity+=((lightsOn?.8:0)-o.l.intensity)*Math.min(1,dt*4);o.lamp.material.emissive.setScalar(o.l.intensity>.3?1:0);});
@@ -1016,6 +1044,7 @@ function build3D(){
     SENSORS.forEach(s=>place(s.mk,s.p3,Wd,Hd));
     roomLbl.concat(outLbl).forEach(o=>place(o.el,o.p,Wd,Hd));
     locks.forEach(o=>place(o.el,o.p,Wd,Hd));
+    if(res.vis){place(resLbl,V(res.x,res.y,2.3),Wd,Hd);resLbl.style.transform+=' translate(-50%,-100%)';}
     if(actor.vis&&!bubble.hidden){place(bubble,V(actor.x,actor.y,2.3+hop(actor)),Wd,Hd);bubble.style.transform+=' translate(-50%,-100%)';}
   }
 
