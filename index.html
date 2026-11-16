@@ -270,7 +270,7 @@ header{background:linear-gradient(180deg,rgba(26,39,46,.85),rgba(20,31,37,.85));
           <div>
             <div class="tag" id="dTag">Como usar</div>
             <h3 id="dName">Escolha um cenário de invasão abaixo</h3>
-            <p id="dDesc">Gire a casa com o mouse e clique em qualquer sensor para ver como ele funciona. Ajuste o modo do alarme e os sensores na central, rode um cenário e acompanhe o que cada sensor detecta, como a casa reage e o que chega no celular do morador.</p>
+            <p id="dDesc">Gire a casa com o mouse e clique em qualquer sensor para ver como ele funciona. Ajuste o modo do alarme e os sensores na central, rode um cenário e acompanhe o que cada sensor detecta, como a casa reage e o que chega no celular do morador. No modo Em casa, o boneco verde é o morador.</p>
           </div>
           <div class="dbtns">
             <button class="btn" id="dTest" hidden>Testar sensor</button>
@@ -381,7 +381,7 @@ const ACTS={
 };
 const MODES={
   desarmado:{name:'Desarmado',pill:'Desarmado',armed:['fogo'],desc:'Só a zona 24 horas (fumaça e gás) fica armada. Portas e movimentos são apenas registrados.'},
-  casa:{name:'Em casa',pill:'Armado · Em casa',armed:['fogo','perimetro','abertura','vidro','camera'],desc:'Para quando os moradores estão dentro, à noite. Protege muro, portas, janelas e áreas externas; movimento interno fica desligado.'},
+  casa:{name:'Em casa',pill:'Armado · Em casa',armed:['fogo','perimetro','abertura','vidro','camera'],desc:'Para quando os moradores estão dentro, à noite. Protege muro, portas, janelas e áreas externas; movimento interno fica desligado. O boneco verde é o morador andando pela casa sem disparar o alarme.'},
   ausente:{name:'Ausente',pill:'Armado · Ausente',armed:['fogo','perimetro','abertura','vidro','camera','movimento'],desc:'Proteção total com a casa vazia. Qualquer movimento interno também dispara o alarme.'}
 };
 
@@ -983,11 +983,11 @@ function build3D(){
     if(wantRes&&!res.vis){Object.assign(res,{x:RES_WALK[0].x,y:RES_WALK[0].y,i:1,wait:1,act:'idle',exit:false});resP.g.position.copy(V(res.x,res.y,0));}
     res.vis=wantRes;resP.g.visible=wantRes;resLbl.hidden=!wantRes;
     if(wantRes){
-      if(state.alarm&&state.alarmKind==='fogo'&&!res.exit){res.exit=true;res.i=0;res.wait=0;}
+      if(state.alarm&&state.alarmKind==='fogo'&&!res.exit){res.exit=true;res.out=false;res.i=0;res.wait=0;log('act','Morador recebeu o aviso e está saindo pela porta da frente');}
       if(!state.alarm&&res.exit){res.exit=false;res.i=0;res.wait=0;}
       const path=res.exit?RES_EXIT:RES_WALK;
       if(res.wait>0){res.wait-=dt;animatePerson(resP,res.act||'idle',dt);}
-      else if(res.exit&&res.i>=path.length){animatePerson(resP,'idle',dt);}
+      else if(res.exit&&res.i>=path.length){animatePerson(resP,'idle',dt);if(!res.out){res.out=true;log('ok','Morador saiu da casa em segurança e está na calçada');notify('Morador em segurança','Você saiu de casa. Ninguém ficou dentro da casa.',{quiet:true});}}
       else{resTo(path,dt);if(!res.exit&&res.i>=path.length)res.i=0;animatePerson(resP,res.exit?'run':'walk',dt);}
       faceMove(resP,V(res.x,res.y,0),dt);
       resRing.material.opacity=.45+.3*Math.sin(T*3);
@@ -1128,9 +1128,12 @@ buildToggles('acts',ACTS,state.acts,(k,on)=>{log(on?'ok':'warn',`${ACTS[k].label
 
 document.querySelectorAll('#modes button').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
 function setMode(m){
+  const prev=state.mode;
   state.mode=m;state.lockOverride=null;
   document.querySelectorAll('#modes button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===m)));
   log(m==='desarmado'?'warn':'ok',`Sistema ${m==='desarmado'?'desarmado':'armado no modo '+MODES[m].name}`);
+  if(m==='casa'&&prev!=='casa')log('info','Morador em casa: ele anda pela sala e pela cozinha, e o movimento interno é só registrado, sem disparar');
+  else if(prev==='casa'&&m==='ausente')log('info','Morador saiu de casa: o movimento interno volta a disparar o alarme');
   if(m==='desarmado'&&state.alarm&&state.alarmKind!=='fogo')silence('Alarme desligado: sistema desarmado com a senha do morador');
   refreshAll();
 }
